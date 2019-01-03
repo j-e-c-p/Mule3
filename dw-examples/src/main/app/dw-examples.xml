@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    
+    <http:listener-config name="httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration" />
+    
+    <apikit:config name="apiConfig" raml="api.raml" consoleEnabled="false" consolePath="console" doc:name="Router" />
+    
+    <flow name="main">
+        <http:listener config-ref="httpListenerConfig" path="/dw/*" doc:name="HTTP" />
+        <logger message="Message received..." level="INFO" doc:name="Logger" />
+        <apikit:router config-ref="apiConfig" doc:name="APIkit Router" />
+    </flow>
+    
+    <!-- Returns an array that is the result of applying a transformation function (lambda) to each of the elements -->
+    <flow name="post:/map:apiConfig">
+    	<logger message="Map" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map ((value, index) -> upper value ++ index)]]></dw:set-payload>
+        </dw:transform-message>
+    </flow><!-- Similar to Map, but instead of processing only the values of an object, it processes both keys and values as a tuple -->
+    <flow name="post:/mapObject:apiConfig">
+    	<logger message="Map Object" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+"test": payload mapObject ((value, key) ->
+	'$key': capitalize value
+)]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    
+    <!-- Pluck is useful for mapping an object into an array -->
+    <flow name="post:/pluck:apiConfig">
+    	<logger message="Pluck" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload pluck $]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    
+    <!-- Apply a reduction to the array using just two parameters: the accumulator ($$), and the value ($). By default, the accumulator starts at the first value of the array -->
+    <flow name="post:/reduce:apiConfig">
+    	<logger message="Reduce" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+underscore (payload reduce ($$ ++ ' ' ++ $))]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    
+    <flow name="post:/coerce:apiConfig">
+    	<logger message="Coerce" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload as :object {class: "com.siemens.test.SimplePojo"}]]></dw:set-payload>
+        </dw:transform-message>
+        
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="sample_data\SimplePojo.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+(payload as :object) pluck ($ ++ $$)]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>  
+    
+    <flow name="post:/function:apiConfig">
+    	<logger message="Function" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleArray.json" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+// FUNCTION
+%function doStuff(data) ({ (data[2..4]): now.year})
+// FUNCTION WITH LAMBDA
+// %var doOtherStuff = (data) -> (now as :string {format: "dd/MM/yyyy"})
+%var doOtherStuff = (data) -> (now as :jsondatetime)
+// CONSTANT
+%var myConstant = "3"
+// CUSTOM TYPE
+%type jsondatetime = :string {format: "yyyy-MM-ddHH:mm:ss"}
+---
+payload map ((item, index) -> 
+	//doStuff(item)
+	doOtherStuff(item) ++ "_" ++ myConstant
+	//myConstant as :number
+)]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+       
+    <flow name="post:/misc1:apiConfig">
+    	<logger message="Misc" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="Transform Message" metadata:id="2805ff70-5048-4f2b-bfd6-5a930c287119">
+            <dw:input-payload doc:sample="requests\simpleObject.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"value": true when payload.key1 == "value2" otherwise false
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>    
+    
+</mule>
